@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>PDF Print Utility</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f4f6fb;color:#182033;font-family:Arial,Helvetica,sans-serif}
+.app{max-width:900px;width:94%;margin:auto;padding:20px 0 45px}
+header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:18px}
+h1{font-size:30px;margin:0 0 6px} header p{margin:0;color:#687386;font-size:14px}
+.badge{background:#e8f8ee;color:#217a43;border-radius:20px;padding:7px 10px;font-size:11px;font-weight:800}
+.card{background:#fff;border:1px solid #e2e7ef;border-radius:16px;padding:16px;margin:13px 0;box-shadow:0 5px 20px rgba(20,30,50,.05)}
+.upload{border:2px dashed #c7d0df;border-radius:13px;min-height:165px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer}
+.upload:hover{background:#f8f9ff;border-color:#5869df}
+.uploadIcon{width:48px;height:48px;border-radius:13px;background:#edf0ff;color:#5061dc;display:grid;place-items:center;font-size:30px;margin-bottom:10px}
+.upload strong{font-size:18px}.upload small{color:#7b8494;margin-top:5px}
+input[type=file]{display:none}
+.hidden{display:none!important}
+.progressRow{display:flex;justify-content:space-between;margin:12px 2px 7px;font-size:13px;color:#606b7c}
+.progress{height:9px;background:#e8ebf1;border-radius:20px;overflow:hidden}.bar{height:100%;width:0;background:#5869df;transition:width .2s}
+.fileInfo{margin-top:10px;padding:11px;border-radius:10px;background:#f5f7fb;font-size:14px}
+h2{font-size:18px;margin:0 0 13px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+button{border:0;border-radius:10px;padding:12px 10px;font-size:14px;font-weight:700;cursor:pointer}
+.quick{background:#edf0f5;color:#354055}.quick:hover{background:#e2e6ef}
+label.field{display:block;font-weight:700;margin:16px 0 7px}
+.pageInput{width:100%;padding:13px;border:1px solid #cbd3df;border-radius:11px;font-size:16px;outline:0}
+.pageInput:focus{border-color:#5869df;box-shadow:0 0 0 3px rgba(88,105,223,.12)}
+.hint{font-size:12px;color:#788294;margin-top:7px}
+.actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+.secondary{background:#edf0f5;color:#354055}.primary{background:#5364df;color:#fff;padding-left:24px;padding-right:24px}
+.primary:disabled{opacity:.5;cursor:not-allowed}
+.summary{display:flex;align-items:center;justify-content:space-between}
+.countLabel{font-size:12px;color:#7a8494}.count{font-size:25px;font-weight:800;margin-top:2px}
+.copy{background:#edf0f5}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:13px}
+.chip{background:#eef0ff;color:#3e4db7;border-radius:7px;padding:6px 8px;font-size:12px;font-weight:700}
+.error{background:#fff0f0;color:#a92a2a;padding:10px;border-radius:9px;margin-top:12px;font-size:13px}
+.status{padding:11px;border-radius:10px;background:#edf8f1;color:#267745;font-size:13px;font-weight:700}
+.note{font-size:12px;line-height:1.45;color:#707b8d;margin-top:8px}
+.preview{display:flex;gap:10px;overflow:auto;padding-bottom:3px}
+.thumb{flex:0 0 125px;border:1px solid #e0e5ed;border-radius:9px;overflow:hidden;background:#fff}
+.thumb canvas{display:block;width:100%;height:auto}.thumb div{text-align:center;padding:6px;font-size:11px;font-weight:700;color:#626d7e}
+#busy{font-size:12px;color:#657084;margin-top:9px}
+@media(max-width:600px){.app{width:96%;padding-top:15px}h1{font-size:26px}.grid{grid-template-columns:1fr 1fr}.card{padding:14px}.actions button{flex:1}}
+@media print{
+ body{background:white}.app>header,.app>section:not(#previewCard){display:none!important}
+ #previewCard{display:block!important;border:0;box-shadow:none;margin:0;padding:0}.preview{display:block}
+ .thumb{width:100%;border:0;page-break-after:always}.thumb div{display:none}
+}
+</style>
+</head>
+<body>
+<main class="app">
+<header>
+<div><h1>PDF Print Utility</h1><p>Select exactly which PDF pages you want to print.</p></div>
+<div class="badge">LOCAL</div>
+</header>
+
+<section class="card">
+<label class="upload" for="pdfInput">
+<div class="uploadIcon">＋</div>
+<strong>Upload PDF</strong>
+<small>Large PDFs supported</small>
+</label>
+<input id="pdfInput" type="file" accept="application/pdf">
+<div id="progressArea" class="hidden">
+<div class="progressRow"><span id="progressText">Preparing...</span><span id="progressPct">0%</span></div>
+<div class="progress"><div id="bar" class="bar"></div></div>
+<div id="busy">The PDF stays on this device.</div>
+</div>
+<div id="fileInfo" class="fileInfo hidden"></div>
+</section>
+
+<section id="controls" class="card hidden">
+<h2>Pages to print</h2>
+<div class="grid">
+<button class="quick" data-mode="all">All Pages</button>
+<button class="quick" data-mode="odd">Odd 1,3,5…</button>
+<button class="quick" data-mode="even">Even 2,4,6…</button>
+<button class="quick" data-mode="reverse">Reverse</button>
+</div>
+<label class="field" for="pageInput">Page / range</label>
+<input id="pageInput" class="pageInput" placeholder="32  |  2-8  |  1,3,5  |  1-5,10-12">
+<div class="hint">Enter a page, range, or comma-separated pages/ranges.</div>
+<div class="actions">
+<button id="clear" class="secondary">Clear</button>
+<button id="print" class="primary" disabled>🖨 Print</button>
+</div>
+</section>
+
+<section id="summaryCard" class="card hidden">
+<div class="summary"><div><div class="countLabel">SELECTED PAGES</div><div id="count" class="count">0 pages</div></div><button id="copy" class="copy">Copy</button></div>
+<div id="chips" class="chips"></div>
+<div id="error" class="error hidden"></div>
+</section>
+
+<section id="printerCard" class="card hidden">
+<h2>Printer</h2>
+<div id="printerStatus" class="status">Ready. Tap Print to open your device's printer selection.</div>
+<div class="note">On Android/Chrome, the system print screen controls available printers. A Wi‑Fi printer must already be connected/configured in the phone's printing service.</div>
+</section>
+
+<section id="previewCard" class="card hidden">
+<h2>Preview</h2><div id="preview" class="preview"></div>
+</section>
+</main>
+
+<!-- PDF.js 3.x uses the classic browser build and exposes window.pdfjsLib. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+let pdfDoc=null,totalPages=0,selected=[],fileName="";
+
+function init(){
+ if(window.pdfjsLib){
+   pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+ } else {
+   showError("PDF engine failed to load. Check your internet connection once, then reload this page.");
+ }
+}
+init();
+
+$("pdfInput").addEventListener("change", async function(){
+ const file=this.files&&this.files[0]; if(!file)return;
+ fileName=file.name;
+ showProgress(5,"Reading PDF file…");
+ try{
+   // Keep the file in memory as an ArrayBuffer; do NOT base64 encode a 45 MB PDF.
+   const buffer=await file.arrayBuffer();
+   showProgress(28,"Opening PDF…");
+   if(!window.pdfjsLib) throw new Error("PDF engine is not loaded.");
+   const task=pdfjsLib.getDocument({data:new Uint8Array(buffer)});
+   task.onProgress=function(p){
+     if(p&&p.total) showProgress(Math.min(75,30+Math.round((p.loaded/p.total)*45)),"Loading PDF…");
+   };
+   pdfDoc=await task.promise;
+   totalPages=pdfDoc.numPages;
+   showProgress(100,"PDF ready ✓");
+   $("fileInfo").textContent="✓ "+fileName+"  •  "+mb(file.size)+" MB  •  "+totalPages+" pages";
+   $("fileInfo").classList.remove("hidden");
+   $("controls").classList.remove("hidden");
+   $("summaryCard").classList.remove("hidden");
+   $("printerCard").classList.remove("hidden");
+   $("previewCard").classList.remove("hidden");
+   // Start with no selected pages so the user explicitly chooses.
+   setSelection([]);
+   $("pageInput").focus();
+   setTimeout(()=>{$("progressArea").classList.add("hidden")},700);
+ }catch(e){
+   console.error(e);
+   showProgress(100,"PDF could not be opened");
+   showError(e&&e.message?e.message:"Unable to open this PDF.");
+ }
+});
+
+document.querySelectorAll("[data-mode]").forEach(btn=>{
+ btn.addEventListener("click",()=>{
+   if(!totalPages)return;
+   let pages=Array.from({length:totalPages},(_,i)=>i+1);
+   if(btn.dataset.mode==="odd")pages=pages.filter(p=>p%2===1);
+   if(btn.dataset.mode==="even")pages=pages.filter(p=>p%2===0);
+   if(btn.dataset.mode==="reverse")pages.reverse();
+   $("pageInput").value=pages.join(",");
+   setSelection(pages);
+   renderPreview(false);
+ });
+});
+
+$("pageInput").addEventListener("input",function(){
+ try{
+   const pages=parsePages(this.value);
+   setSelection(pages);
+   renderPreview(false);
+ }catch(e){setSelection([]);showError(e.message)}
+});
+
+$("clear").onclick=function(){
+ $("pageInput").value="";setSelection([]);$("preview").innerHTML="";
+};
+
+$("copy").onclick=async function(){
+ if(selected.length&&navigator.clipboard)await navigator.clipboard.writeText(selected.join(","));
+};
+
+$("print").onclick=async function(){
+ if(!pdfDoc||!selected.length){showError("Choose at least one page.");return}
+ $("print").disabled=true;
+ $("printerStatus").textContent="Preparing "+selected.length+" selected page(s) for printing…";
+ try{
+   await renderPreview(true);
+   $("printerStatus").textContent="Opening system printer selection…";
+   // Browser/Android system print dialog is responsible for showing configured Wi‑Fi printers.
+   setTimeout(()=>window.print(),150);
+ }catch(e){showError("Could not prepare the print pages: "+e.message)}
+ finally{setTimeout(()=>{$("print").disabled=false},500)}
+};
+
+function parsePages(value){
+ if(!value.trim())return[];
+ const out=new Set();
+ for(const raw of value.split(",")){
+   const t=raw.trim();if(!t)continue;
+   if(/^\d+$/.test(t)){const p=Number(t);valid(p);out.add(p)}
+   else if(/^\d+\s*-\s*\d+$/.test(t)){
+     const parts=t.split("-").map(Number),a=parts[0],b=parts[1];
+     if(a>b)throw new Error("Invalid range "+t+". Use smaller page first.");
+     valid(a);valid(b);
+     for(let p=a;p<=b;p++)out.add(p);
+   }else throw new Error('Invalid page input: "'+t+'"');
+ }
+ return [...out];
+}
+function valid(p){if(p<1||p>totalPages)throw new Error("Page "+p+" is outside 1–"+totalPages+".")}
+function setSelection(pages){
+ selected=[...new Set(pages)];
+ $("count").textContent=selected.length+" page"+(selected.length===1?"":"s");
+ $("chips").innerHTML=selected.map(p=>'<span class="chip">'+p+"</span>").join("");
+ $("print").disabled=!selected.length;
+ $("error").classList.add("hidden");
+}
+function showError(msg){$("error").textContent=msg;$("error").classList.remove("hidden")}
+function showProgress(p,text){$("progressArea").classList.remove("hidden");$("bar").style.width=p+"%";$("progressPct").textContent=p+"%";$("progressText").textContent=text}
+function mb(n){return(n/1048576).toFixed(1)}
+async function renderPreview(forPrint){
+ if(!pdfDoc)return;
+ const box=$("preview");box.innerHTML="";
+ // For normal preview show first 12. For printing render only the pages selected by the user.
+ const pages=forPrint?selected:selected.slice(0,12);
+ for(const no of pages){
+   const page=await pdfDoc.getPage(no);
+   const scale=forPrint?1.7:.62;
+   const vp=page.getViewport({scale});
+   const wrap=document.createElement("div");wrap.className="thumb";
+   const canvas=document.createElement("canvas");canvas.width=Math.ceil(vp.width);canvas.height=Math.ceil(vp.height);
+   const label=document.createElement("div");label.textContent="Page "+no;
+   wrap.append(canvas,label);box.appendChild(wrap);
+   await page.render({canvasContext:canvas.getContext("2d",{alpha:false}),viewport:vp}).promise;
+ }
+ if(!forPrint&&selected.length>12){
+   const note=document.createElement("div");note.style.padding="10px";note.style.color="#718094";
+   note.textContent="Preview shows first 12 selected pages. All selected pages will be prepared for printing.";
+   box.appendChild(note);
+ }
+}
+})();
+</script>
+</body>
+</html>
